@@ -2,12 +2,17 @@
 return [
     'settings' => [
         'prefixApi' => '/api/v1',
+        'tc24' => [
+            'url' => 'http://tc24-api-beta.test',
+            'prefixApi' => '/ygt/v1',
+            'buildUrl' => 'http://tc24-api-beta.test/ygt/v1',
+        ],
         'displayErrorDetails' => true, // set to false in production
         'addContentLengthHeader' => false, // Allow the web server to send the content-length header
 
         // Monolog settings
         'logger' => [
-            'name' => 'slim-app',
+            'name' => 'app',
             'path' => __DIR__ . '/../logs/app.log',
             'level' => \Monolog\Logger::DEBUG,
         ],
@@ -17,10 +22,10 @@ return [
             'meta' => [
                 'entity_path' => [
                     // TODO: Register automatically all the modules entity
-                    __DIR__ . '/../src/Modules/Tracking/Entity'
+                    __DIR__ . '/../app/src/Entity'
                 ],
                 'auto_generate_proxies' => true,
-                'proxy_dir' =>  __DIR__.'/../cache/proxies',
+                'proxy_dir' =>  __DIR__ . '/../cache/proxies',
                 'cache' => null,
             ],
             'connection' => [

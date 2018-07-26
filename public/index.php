@@ -14,35 +14,19 @@ require __DIR__ . '/../vendor/autoload.php';
 session_start();
 
 // Instantiate the app
-$settings = require __DIR__ . '/../src/App/settings.php';
+$settings = require __DIR__ . '/../app/settings.php';
 $app = new \Slim\App($settings);
 $container = $app->getContainer();
 
 
 // Set up global dependencies
-require __DIR__ . '/../src/App/dependencies.php';
+require __DIR__ . '/../app/dependencies.php';
 
 // Register global middleware's
-require __DIR__ . '/../src/App/middleware.php';
+require __DIR__ . '/../app/middleware.php';
 
 // Register global routes
-require __DIR__ . '/../src/App/routes.php';
-
-// Register the modules dependencies, routes etc ...
-// Iteract All Modules
-foreach (glob(__DIR__ . '/../src/Modules/*' , GLOB_ONLYDIR) as $module) {
-    // Get files of modules
-    foreach (glob($module . '/*.php') as $filename) {
-        require_once $filename;
-    }
-}
-
+require __DIR__ . '/../app/routes.php';
 
 // Run app
-try {
-    $app->run();
-} catch (\Slim\Exception\MethodNotAllowedException $e) {
-
-} catch (\Slim\Exception\NotFoundException $e) {
-
-}
+$app->run();

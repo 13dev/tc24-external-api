@@ -3,7 +3,7 @@
 // Doctrine
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 
-$settings = (require __DIR__ . '/../src/App/settings.php')['settings']['doctrine'];
+$settings = (require __DIR__ . '/app/settings.php')['settings']['doctrine'];
 
 $config = \Doctrine\ORM\Tools\Setup::createAnnotationMetadataConfiguration(
     $settings['meta']['entity_path'],

@@ -1,21 +1,19 @@
 {
-    "name": "slim/slim-skeleton",
-    "description": "A Slim Framework skeleton application for rapid development",
+    "description": "Micro service for travel central",
     "keywords": ["microframework", "rest", "router", "psr7"],
-    "homepage": "http://github.com/slimphp/Slim-Skeleton",
     "license": "MIT",
-    "authors": [
-        {
-            "name": "Josh Lockhart",
-            "email": "info@joshlockhart.com",
-            "homepage": "http://www.joshlockhart.com/"
-        }
-    ],
     "require": {
         "php": ">=5.5.0",
         "slim/slim": "^3.1",
         "monolog/monolog": "^1.17",
-        "doctrine/orm": "^2.5"
+        "doctrine/orm": "^2.5",
+        "guzzlehttp/guzzle": "^6.3",
+        "awurth/slim-validation": "^2.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/src"
+        }
     },
     "require-dev": {
         "phpunit/phpunit": ">=4.8 < 6.0"
