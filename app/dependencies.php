@@ -5,6 +5,10 @@
  * @param $c - container
  * @return \Monolog\Logger
  */
+
+use App\JsonResponse;
+use Slim\Http\Headers;
+
 $container['logger'] = function ($c) {
     $settings = $c->get('settings')['logger'];
     $logger = new Monolog\Logger($settings['name']);
