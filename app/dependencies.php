@@ -1,14 +1,12 @@
 <?php
 
+use App\FJson;
+
 /**
  * Inject Monolog
  * @param $c - container
  * @return \Monolog\Logger
  */
-
-use App\JsonResponse;
-use Slim\Http\Headers;
-
 $container['logger'] = function ($c) {
     $settings = $c->get('settings')['logger'];
     $logger = new Monolog\Logger($settings['name']);
@@ -43,6 +41,15 @@ $container['em'] = function ($c) {
 };
 
 /**
+ * Inject a customer response to format json.
+ * @param $container
+ * @return FJson
+ */
+$container['fjson'] = function($container) {
+    return new FJson($container->get('response'));
+};
+
+/**
  * Generic Exceptions to JSON
  */
 $container['errorHandler'] = function ($container) {
@@ -53,6 +60,7 @@ $container['errorHandler'] = function ($container) {
             ->withJson(['message' => $exception->getMessage()], $statusCode);
     };
 };
+
 /**
  * Exceptions 405 - Not Allowed to Json
  */

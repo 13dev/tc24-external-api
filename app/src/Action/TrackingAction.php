@@ -9,7 +9,7 @@
 namespace App\Action;
 use App\Entity\Customer;
 use App\Entity\Tracker;
-use App\JsonResponse;
+use App\FJson;
 use App\MessageEnum;
 use App\Resource\CustomerResource;
 use App\Resource\TrackerResource;
@@ -17,6 +17,7 @@ use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
+use Monolog\Logger;
 use Respect\Validation\Rules\Json;
 use Slim\Container;
 use Slim\Http\Request;
@@ -25,6 +26,8 @@ use Respect\Validation\Validator as V;
 
 /**
  * Class TrackingAction
+ * @property \App\FJson fjson
+ * @property Logger logger
  * @package App\Action
  */
 class TrackingAction extends Action
@@ -51,19 +54,18 @@ class TrackingAction extends Action
      * @param Request $request
      * @param Response $response
      * @param $args
-     * @return JsonResponse
+     * @return FJson
      * @throws GuzzleException
      * @throws ORMException
      */
     public function postTracking(Request $request, Response $response, $args) {
+        return $this->fjson->notFound();
 
-        return new JsonResponse();
         $this->logger->info('postTraking called!');
 
         // Verify Token
         if(!$request->hasHeader('token')){
             $this->logger->info('No token on request!');
-            return new ErrorJsonResponse(null, MessageEnum::NO_TOKEN_REQUEST, null, 400);
         }
         $this->logger->info('Token exists!');
 
@@ -78,7 +80,7 @@ class TrackingAction extends Action
             // Verify validation
             if(!$validator->isValid()) {
                 // Verification fails
-                return (new JsonResponse(MessageEnum::PARAM_VALIDATION_ERROR, 6, 400, $validator->getErrors()))->loadReturn();
+                //return (new FJson(MessageEnum::PARAM_VALIDATION_ERROR, 6, 400, $validator->getErrors()))->loadReturn();
             }
 
             $tracker = new Tracker();
@@ -95,17 +97,17 @@ class TrackingAction extends Action
                 $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
 
                 // Show message to user
-                return (new JsonResponse(MessageEnum::FAILED_INSERT, 6, 400))->loadReturn();
+               // return (new FJson(MessageEnum::FAILED_INSERT, 6, 400))->loadReturn();
             } catch (ORMException $e) {
             }
 
-            return $response->withJson([
-                'status' => 200,
-                'code' => 4,
-                'data' => [
-                    json_encode($customer, true)
-                ],
-            ]);
+//            //return $response->withJson([
+//            //    'status' => 200,
+//                'code' => 4,
+//                'data' => [
+//                    json_encode($customer, true)
+//                ],
+//            ]);
 
         }
         // Search by token
@@ -134,15 +136,15 @@ class TrackingAction extends Action
                 $responseData['data'] = json_decode($responseTC->getBody()->getContents(), true);
 
             // no information about the customer.
-            if($responseData['data'] === null)
-                return (new JsonResponse(MessageEnum::CUSTOMER_NO_INFORMATION, 3, 204))->loadReturn();
+           // if($responseData['data'] === null)
+                //return (new FJson(MessageEnum::CUSTOMER_NO_INFORMATION, 3, 204))->loadReturn();
 
 
         } catch (ClientException $e) {
             $this->logger->error('Guzzle client Exception ' . $e->getCode() . '  ' . $e->getMessage());
 
             // Has no body the response
-            if(!$e->hasResponse()) (new JsonResponse(MessageEnum::FAILED_REQUEST, 3, 204))->loadReturn();
+            // if(!$e->hasResponse()) (new FJson(MessageEnum::FAILED_REQUEST, 3, 204))->loadReturn();
 
             // return the json of TC24 API
             return $response->withJson(json_decode($e->getResponse()->getBody()->getContents()));
@@ -152,7 +154,7 @@ class TrackingAction extends Action
         // Verify validation
         if(!$validator->isValid()) {
             // Verification fails
-            return (new JsonResponse(MessageEnum::PARAM_VALIDATION_ERROR, 6, 400, $validator->getErrors()))->loadReturn();
+            //return (new FJson(MessageEnum::PARAM_VALIDATION_ERROR, 6, 400, $validator->getErrors()))->loadReturn();
         }
 
         // Store in DB
@@ -179,7 +181,7 @@ class TrackingAction extends Action
             $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
 
             // Show message to user
-            return (new JsonResponse(MessageEnum::FAILED_INSERT, 6, 400))->loadReturn();
+            //return (new FJson(MessageEnum::FAILED_INSERT, 6, 400))->loadReturn();
         }
 
 
