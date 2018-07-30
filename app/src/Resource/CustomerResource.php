@@ -38,6 +38,21 @@ class CustomerResource extends Resource
     }
 
     /**
+     * @param string $token
+     * @return null | Customer
+     */
+    public function findByToken(string $token) {
+        if(!$token)
+            return null;
+
+        $customer = $this->em
+            ->getRepository(Customer::class)
+            ->findOneBy(['token' => $token]);
+
+        /** @var Customer $customer */
+        return $customer;
+    }
+    /**
      * @param $token
      * @return null | Customer
      */

@@ -34,4 +34,22 @@ abstract class MessageEnum
 
     // Occurred one exception
     public const OCCURRED_EXCEPTION = 'Unexpected error, please try again!';
+
+    // Failed to update
+    public const FAIL_UPDATE = 'Unable to update records, please try again!';
+
+    // This error occurs when doctrine try update / create data already existent on db
+    public const UNIQUE_VIOLATION = 'Unique constraint violation, contact administrator!';
+
+    // Customer was not found.
+    public const CUSTOMER_NOT_FOUND = 'Customer not found, please try again with another token.';
+
+    // Customer doesn't have tracker ?!
+    public const CUSTOMER_NO_TRACKER = 'You don\'t have tracker yet!';
+
+    // This message will be show when te TC24 /customer/current return HTTP_UNAUTHORIZED
+    public const INVALID_TOKEN = 'You provide a invalid token, please try again!';
+
+    // This message will be show when te removed successfully
+    public const REMOVED = 'Removed successfully!';
 }

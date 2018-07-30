@@ -16,11 +16,15 @@ use App\MessageEnum;
 use App\Resource\CustomerResource;
 use App\Resource\TrackerResource;
 use Doctrine\DBAL\Exception\NotNullConstraintViolationException;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\DBAL\Schema\Visitor\RemoveNamespacedAssets;
+use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use Monolog\Logger;
+use Psr\Http\Message\ResponseInterface;
 use Slim\Container;
 use Slim\Http\Request;
 use Slim\Http\Response;
@@ -31,6 +35,7 @@ use Respect\Validation\Validator as V;
  * @property \App\FJson fjson
  * @property Logger logger
  * @property \Awurth\SlimValidation\Validator validator
+ * @property EntityManager em
  * @package App\Action
  */
 class TrackingAction extends Action
@@ -71,7 +76,7 @@ class TrackingAction extends Action
      * @param $args
      * @return Response
      */
-    public function postTracking(Request $request, Response $response, $args)
+    public function postTracking(Request $request, Response $response, $args): Response
     {
 
         $this->logger->info('postTraking called!');
@@ -95,7 +100,33 @@ class TrackingAction extends Action
         // User already on DB
         if ($customer = $this->customerResource->exists($token)) {
             //Separate logic
-            $this->handleCustomerExists($customer, $request, $response, $args);
+            try {
+                /**
+                 * This function will return (if doesn't throw exception) the updated data.
+                 */
+               return $this->handleCustomerExists($customer, $request, $response, $args);
+
+            } catch (UniqueConstraintViolationException $e) {
+                // Save to log
+                $this->logger->error(MessageEnum::UNIQUE_VIOLATION . ' -> ' . $e->getMessage());
+
+                //Return generic message
+                return $this->fjson->renderException(HTTPCode::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::UNIQUE_VIOLATION );
+
+            } catch (OptimisticLockException $e) {
+                // Save to log
+                $this->logger->error(MessageEnum::OCCURRED_EXCEPTION . ' -> ' . $e->getMessage());
+
+                //Return generic message
+                return $this->fjson->renderException(HTTPCode::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::OCCURRED_EXCEPTION );
+
+            } catch (ORMException $e) {
+                // Save to log
+                $this->logger->error(MessageEnum::OCCURRED_EXCEPTION . ' -> ' . $e->getMessage());
+
+                //Return generic message
+                return $this->fjson->renderException(HTTPCode::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::OCCURRED_EXCEPTION );
+            }
         }
 
         // Make a request to get current user
@@ -109,6 +140,10 @@ class TrackingAction extends Action
 
         } catch (GuzzleException $e) {
             $this->logger->error('GuzzleException -> ' . $e->getCode() . '  ' . $e->getMessage());
+            //Invalid token ?!
+            if($e->getCode() === HTTPCode::HTTP_UNAUTHORIZED) {
+                return $this->fjson->renderException(HTTPCode::HTTP_UNAUTHORIZED, MessageEnum::INVALID_TOKEN);
+            }
 
             return $this->fjson->renderException(HTTPCode::HTTP_NOT_FOUND, MessageEnum::FAILED_REQUEST);
         }
@@ -140,7 +175,7 @@ class TrackingAction extends Action
             $this->customerResource->store($customer);
             // Store Tracker
             $this->trackerResource->store($tracker);
-        } catch (ORMException | OptimisticLockException | NotNullConstraintViolationException $e) {
+        } catch (ORMException | OptimisticLockException | UniqueConstraintViolationException | NotNullConstraintViolationException $e) {
             //Store on Logger
             $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
 
@@ -153,6 +188,49 @@ class TrackingAction extends Action
     }
 
     /**
+     * @param Request $request
+     * @param Response $response
+     * @param $args
+     * @return Response
+     */
+    public function getTracking(Request $request, Response $response, $args): Response
+    {
+        // Get Token
+        $token = $request->getHeaderLine('token');
+
+        if(!$customer = $this->customerResource->findByToken($token)) {
+            //Customer not found
+
+            //Save to log
+            $this->logger->alert(MessageEnum::CUSTOMER_NOT_FOUND);
+
+            //Return generic message
+            return $this->fjson->notFound(MessageEnum::CUSTOMER_NOT_FOUND);
+        }
+
+        // Customer was found.
+
+        //Search tracker
+        if(!$cTracker = $this->trackerResource->findByCustomer($customer)) {
+            //Tracker not found
+            //Save to log
+            $this->logger->alert(MessageEnum::CUSTOMER_NO_TRACKER);
+
+            //Return generic message
+            return $this->fjson->notFound(MessageEnum::CUSTOMER_NO_TRACKER);
+        }
+
+        // Return information about tracking and customer.
+        return $this->fjson->render([
+            'email' => $customer->getEmail(),
+            'latitude' => $cTracker->getLatitude(),
+            'longitude' => $cTracker->getLongitude(),
+            'address' => $cTracker->getAddress(),
+            'created' => $cTracker->getCreated()
+        ]);
+    }
+
+    /**
      * Handle When customer exists on DB
      * USED ON postTracking function
      * @param Customer $customer
@@ -160,31 +238,56 @@ class TrackingAction extends Action
      * @param Response $response
      * @param $args
      * @return Response
+     * @throws OptimisticLockException
+     * @throws ORMException
+     * @throws UniqueConstraintViolationException
      */
     private function handleCustomerExists(Customer $customer, Request $request, Response $response, $args): Response
     {
+        // Search if tracker exists, and return - it !
+        if($uTracker = $this->trackerResource->exists($customer->getId())){
 
+            $uTracker->setAddress($request->getParam('address'));
+            $uTracker->setLatitude($request->getParam('latitude'));
+            $uTracker->setLongitude($request->getParam('longitude'));
+
+            try {
+
+                $this->em->flush();
+
+            } catch (OptimisticLockException $e) {
+                throw new OptimisticLockException(MessageEnum::FAIL_UPDATE, $uTracker);
+
+            } catch (ORMException $e) {
+                throw new ORMException(MessageEnum::FAIL_UPDATE);
+            }
+
+
+            return $this->fjson->render([
+                'latitude' => $uTracker->getLatitude(),
+                'longitude' => $uTracker->getLongitude(),
+                'address' => $uTracker->getAddress(),
+            ], HTTPCode::HTTP_OK);
+        }
+
+        // Track doesn't exists, assign the customer and save it
+        // create tracker from entity
         $tracker = new Tracker();
         $tracker->setAddress($request->getParam('address'));
-        /** @var Customer $customer */
-        $tracker->setCustomer($customer);
         $tracker->setLatitude($request->getParam('latitude'));
         $tracker->setLongitude($request->getParam('longitude'));
+        /** @var Customer $customer */
+        $tracker->setCustomer($customer);
 
         try {
+
             $this->trackerResource->store($tracker);
+
         } catch (OptimisticLockException $e) {
-            //Store on Logger
-            $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
+            throw new OptimisticLockException(MessageEnum::FAILED_INSERT, $tracker);
 
-            // Show message to user
-            return $this->fjson->render(null, HTTPCode::HTTP_BAD_REQUEST, MessageEnum::FAILED_INSERT);
         } catch (ORMException $e) {
-            //Store on Logger
-            $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
-
-            // Show message to user
-            return $this->fjson->render(null, HTTPCode::HTTP_OK, MessageEnum::FAILED_INSERT);
+            throw new ORMException(MessageEnum::FAILED_INSERT);
         }
 
         return $this->fjson->render([json_encode($customer, true)], HTTPCode::HTTP_OK);
