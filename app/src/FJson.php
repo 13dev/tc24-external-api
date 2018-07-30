@@ -42,7 +42,8 @@ class FJson {
      * @param string $message
      * @return Response
      */
-    public function notFound($message = '') {
+    public function notFound($message = ''): Response
+    {
         $this->formattedResponse['status'] = 404;
         if(empty($message))
             $this->formattedResponse['message'] = MessageEnum::NOT_FOUND;
@@ -60,7 +61,9 @@ class FJson {
      * @param string $message
      * @return Response
      */
-    public function render($data = [], $status = 200, $message = '') {
+    public function render(array $data = [], $status = 200, $message = ''): Response
+    {
+
         $this->formattedResponse['data'] = $data;
         $this->formattedResponse['status'] = $status;
         $this->formattedResponse['message'] = $message;
@@ -80,13 +83,23 @@ class FJson {
      * @param string $message
      * @return Response
      */
-    public function renderException($status = 200, $message = '') {
+    public function renderException($status = 200, $message = ''): Response
+    {
+
+        //set status
         $this->formattedResponse['status'] = $status;
 
         // Set default message
-        if(empty($message))
+        if(empty($message)){
             $this->formattedResponse['message'] = MessageEnum::OCCURRED_EXCEPTION;
+        } else {
+            $this->formattedResponse['message'] = $message;
+        }
 
+        // Non require data param to exception
+        unset($this->formattedResponse['data']);
+
+        //return response
         return $this->_response
             ->withStatus($status)
             ->withJson($this->formattedResponse);

@@ -7,18 +7,20 @@
  */
 
 namespace App\Action;
+
 use App\Entity\Customer;
 use App\Entity\Tracker;
-use App\FJson;
+use App\Exceptions\RequestBodyEmptyException;
+use App\HTTPCode;
 use App\MessageEnum;
 use App\Resource\CustomerResource;
 use App\Resource\TrackerResource;
+use Doctrine\DBAL\Exception\NotNullConstraintViolationException;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use Monolog\Logger;
-use Respect\Validation\Rules\Json;
 use Slim\Container;
 use Slim\Http\Request;
 use Slim\Http\Response;
@@ -28,6 +30,7 @@ use Respect\Validation\Validator as V;
  * Class TrackingAction
  * @property \App\FJson fjson
  * @property Logger logger
+ * @property \Awurth\SlimValidation\Validator validator
  * @package App\Action
  */
 class TrackingAction extends Action
@@ -42,167 +45,190 @@ class TrackingAction extends Action
      */
     private $customerResource;
 
+    /**
+     * @var string
+     */
+    private $customerCurrentUrl;
+
+    /**
+     * @var \GuzzleHttp\Client
+     */
+    private $guzzleClient;
+
 
     public function __construct(Container $container, TrackerResource $trackerResource, CustomerResource $customerResource)
     {
         parent::__construct($container);
         $this->trackerResource = $trackerResource;
         $this->customerResource = $customerResource;
+        $this->customerCurrentUrl = $this->settings['tc24']['buildUrl'];
+        $this->guzzleClient = new \GuzzleHttp\Client();
     }
 
     /**
      * @param Request $request
      * @param Response $response
      * @param $args
-     * @return FJson
-     * @throws GuzzleException
-     * @throws ORMException
+     * @return Response
      */
-    public function postTracking(Request $request, Response $response, $args) {
-        return $this->fjson->notFound();
+    public function postTracking(Request $request, Response $response, $args)
+    {
 
         $this->logger->info('postTraking called!');
-
-        // Verify Token
-        if(!$request->hasHeader('token')){
-            $this->logger->info('No token on request!');
-        }
-        $this->logger->info('Token exists!');
 
         // Get token
         $token = $request->getHeaderLine('token');
 
-        // User already on DB
-        if($customer = $this->customerResource->exists($token)) {
+        // Verify validation
+        if (!$this->validateParams($request)->isValid()) {
 
-            // Validation Params
-            $validator = $this->validateParams($request);
-            // Verify validation
-            if(!$validator->isValid()) {
-                // Verification fails
-                //return (new FJson(MessageEnum::PARAM_VALIDATION_ERROR, 6, 400, $validator->getErrors()))->loadReturn();
-            }
+            $this->logger->info('validateParams failed!');
 
-            $tracker = new Tracker();
-            $tracker->setAddress($request->getParam('address'));
-            /** @var Customer $customer */
-            $tracker->setCustomer($customer);
-            $tracker->setLatitude($request->getParam('latitude'));
-            $tracker->setLongitude($request->getParam('longitude'));
-
-            try {
-                $this->trackerResource->store($tracker);
-            } catch (OptimisticLockException $e) {
-                //Store on Logger
-                $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
-
-                // Show message to user
-               // return (new FJson(MessageEnum::FAILED_INSERT, 6, 400))->loadReturn();
-            } catch (ORMException $e) {
-            }
-
-//            //return $response->withJson([
-//            //    'status' => 200,
-//                'code' => 4,
-//                'data' => [
-//                    json_encode($customer, true)
-//                ],
-//            ]);
+            // Verification fails
+            return $this->fjson->renderException(
+                HTTPCode::HTTP_BAD_REQUEST,
+                MessageEnum::PARAM_VALIDATION_ERROR
+            );
 
         }
-        // Search by token
-        // Verify if exists on DB
+
+        // User already on DB
+        if ($customer = $this->customerResource->exists($token)) {
+            //Separate logic
+            $this->handleCustomerExists($customer, $request, $response, $args);
+        }
 
         // Make a request to get current user
-        $client = new \GuzzleHttp\Client();
-        $url = $this->settings['tc24']['buildUrl'];
-
         try {
-            // make request to get information about the token
-            $responseTC = $client->request('GET',"{$url}/customers/current", [
-                'headers' => [
-                    'token' => $token
-                ]
-            ]);
+            $customerInformation = $this->handleCustomerInformation($token);
 
-            // Build response array
-            $responseData = [
-                'status' => $responseTC->getStatusCode(),
-                'code' => 4,
-            ];
+        } catch (RequestBodyEmptyException $e) {
+            $this->logger->error('RequestBodyEmptyException -> ' . $e->getMessage());
 
-            // Include data if has body
-            if($responseTC->getBody())
-                $responseData['data'] = json_decode($responseTC->getBody()->getContents(), true);
+            return $this->fjson->renderException(HTTPCode::HTTP_OK, $e->getMessage());
 
-            // no information about the customer.
-           // if($responseData['data'] === null)
-                //return (new FJson(MessageEnum::CUSTOMER_NO_INFORMATION, 3, 204))->loadReturn();
+        } catch (GuzzleException $e) {
+            $this->logger->error('GuzzleException -> ' . $e->getCode() . '  ' . $e->getMessage());
 
-
-        } catch (ClientException $e) {
-            $this->logger->error('Guzzle client Exception ' . $e->getCode() . '  ' . $e->getMessage());
-
-            // Has no body the response
-            // if(!$e->hasResponse()) (new FJson(MessageEnum::FAILED_REQUEST, 3, 204))->loadReturn();
-
-            // return the json of TC24 API
-            return $response->withJson(json_decode($e->getResponse()->getBody()->getContents()));
+            return $this->fjson->renderException(HTTPCode::HTTP_NOT_FOUND, MessageEnum::FAILED_REQUEST);
         }
 
         $validator = $this->validateParams($request);
         // Verify validation
-        if(!$validator->isValid()) {
+        if (!$validator->isValid()) {
             // Verification fails
-            //return (new FJson(MessageEnum::PARAM_VALIDATION_ERROR, 6, 400, $validator->getErrors()))->loadReturn();
+            return $this->fjson->render($validator->getErrors(), HTTPCode::HTTP_BAD_REQUEST, MessageEnum::PARAM_VALIDATION_ERROR);
         }
 
-        // Store in DB
-        // Create new Customer
-        $customer = new Customer();
-        //$customer->setUid($responseData['data']['code']);
-        $customer->setUid(time());
-        $customer->setEmail($responseData['data']['email']);
-        $customer->setToken($token);
+        try {
+
+            // Store in DB
+            // Create new Customer
+            $customer = new Customer();
+            //$customer->setUid($responseData['data']['code']);
+            $customer->setUid(time());
+            $customer->setEmail($customerInformation['email']);
+            $customer->setToken($token);
+
+            $tracker = new Tracker();
+            $tracker->setAddress($request->getParam('address'));
+            $tracker->setCustomer($customer);
+            $tracker->setLatitude($request->getParam('latitude'));
+            $tracker->setLongitude($request->getParam('longitude'));
+
+            // Store customer
+            $this->customerResource->store($customer);
+            // Store Tracker
+            $this->trackerResource->store($tracker);
+        } catch (ORMException | OptimisticLockException | NotNullConstraintViolationException $e) {
+            //Store on Logger
+            $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
+
+            // Show message to user
+            return $this->fjson->renderException(HTTPCode::HTTP_OK, MessageEnum::FAILED_INSERT);
+        }
+
+        return $this->fjson->render($customerInformation, HTTPCode::HTTP_OK);
+
+    }
+
+    /**
+     * Handle When customer exists on DB
+     * USED ON postTracking function
+     * @param Customer $customer
+     * @param Request $request
+     * @param Response $response
+     * @param $args
+     * @return Response
+     */
+    private function handleCustomerExists(Customer $customer, Request $request, Response $response, $args): Response
+    {
 
         $tracker = new Tracker();
         $tracker->setAddress($request->getParam('address'));
+        /** @var Customer $customer */
         $tracker->setCustomer($customer);
         $tracker->setLatitude($request->getParam('latitude'));
         $tracker->setLongitude($request->getParam('longitude'));
 
         try {
-            // Store customer
-            $this->customerResource->store($customer);
-            // Store Tracker
             $this->trackerResource->store($tracker);
         } catch (OptimisticLockException $e) {
             //Store on Logger
             $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
 
             // Show message to user
-            //return (new FJson(MessageEnum::FAILED_INSERT, 6, 400))->loadReturn();
+            return $this->fjson->render(null, HTTPCode::HTTP_BAD_REQUEST, MessageEnum::FAILED_INSERT);
+        } catch (ORMException $e) {
+            //Store on Logger
+            $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
+
+            // Show message to user
+            return $this->fjson->render(null, HTTPCode::HTTP_OK, MessageEnum::FAILED_INSERT);
         }
 
+        return $this->fjson->render([json_encode($customer, true)], HTTPCode::HTTP_OK);
 
-        return $response->withJson($responseData);
+    }
 
+    /**
+     * Make request to current route and get information about user
+     * This will perhaps return user information if not, catch exception.
+     * @param string $token Token of user
+     *
+     * @throws ClientException
+     * @throws GuzzleException
+     *
+     * @return mixed|Response
+     * @throws RequestBodyEmptyException
+     */
+    private function handleCustomerInformation(string $token) {
 
-        /**
-         * Get Header -token
-         *  eXISTS ?
-         * Is valid ?
-         * Get DATA
-         * VERIFY DB EXISTS
-         * GET GPS DATA
-         * INSERT ON DB
-         */
+        // make request to get information about the token
+        $responseTC = $this->guzzleClient->request(
+            'GET',
+            "{$this->customerCurrentUrl}/customers/current", [
+                'headers' => [
+                    'token' => $token
+                ]
+        ]);
+
+        //retrieve all data from stream
+        $stream = (string) $responseTC->getBody();
+
+        //Throw exception
+        if(!$stream || empty($stream))
+            throw new RequestBodyEmptyException(MessageEnum::CUSTOMER_NO_INFORMATION);
+
+        return json_decode($stream, true);
+
     }
 
     /**
      * @return \Awurth\SlimValidation\Validator
      */
-    private function validateParams(Request $request) {
+    private function validateParams(Request $request): \Awurth\SlimValidation\Validator
+    {
 
         return $this->validator->validate($request, [
             'address' => V::notEmpty(),

@@ -1,6 +1,7 @@
 <?php
 
 use App\FJson;
+use Slim\Http\Headers;
 
 /**
  * Inject Monolog
@@ -49,43 +50,43 @@ $container['fjson'] = function($container) {
     return new FJson($container->get('response'));
 };
 
-/**
- * Generic Exceptions to JSON
- */
-$container['errorHandler'] = function ($container) {
-    return function ($request, $response, $exception) use ($container) {
-        $statusCode = $exception->getCode() ? $exception->getCode() : 500;
-        return $container['response']->withStatus($statusCode)
-            ->withHeader('Content-Type', 'Application/json')
-            ->withJson(['message' => $exception->getMessage()], $statusCode);
-    };
-};
-
-/**
- * Exceptions 405 - Not Allowed to Json
- */
-$container['notAllowedHandler'] = function ($container) {
-    return function ($request, $response, $methods) use ($container) {
-        return $container['response']
-            ->withStatus(405)
-            ->withHeader('Allow', implode(', ', $methods))
-            ->withHeader('Content-Type', 'Application/json')
-            ->withHeader('Access-Control-Allow-Methods', implode(",", $methods))
-            ->withJson(['message' => 'Method not Allowed; Method must be one of: ' . implode(', ', $methods)], 405);
-    };
-};
-
-/**
- * Exceptions 404 - Not Found to JSON
- */
-$container['notFoundHandler'] = function ($container) {
-    return function ($request, $response) use ($container) {
-        return $container['response']
-            ->withStatus(404)
-            ->withHeader('Content-Type', 'Application/json')
-            ->withJson(['message' => 'Page not found']);
-    };
-};
+///**
+// * Generic Exceptions to JSON
+// */
+//$container['errorHandler'] = function ($container) {
+//    return function ($request, $response, $exception) use ($container) {
+//        $statusCode = $exception->getCode() ? $exception->getCode() : 500;
+//        return $container['response']->withStatus($statusCode)
+//            ->withHeader('Content-Type', 'Application/json')
+//            ->withJson(['message' => $exception->getMessage()], $statusCode);
+//    };
+//};
+//
+///**
+// * Exceptions 405 - Not Allowed to Json
+// */
+//$container['notAllowedHandler'] = function ($container) {
+//    return function ($request, $response, $methods) use ($container) {
+//        return $container['response']
+//            ->withStatus(405)
+//            ->withHeader('Allow', implode(', ', $methods))
+//            ->withHeader('Content-Type', 'Application/json')
+//            ->withHeader('Access-Control-Allow-Methods', implode(",", $methods))
+//            ->withJson(['message' => 'Method not Allowed; Method must be one of: ' . implode(', ', $methods)], 405);
+//    };
+//};
+//
+///**
+// * Exceptions 404 - Not Found to JSON
+// */
+//$container['notFoundHandler'] = function ($container) {
+//    return function ($request, $response) use ($container) {
+//        return $container['response']
+//            ->withStatus(404)
+//            ->withHeader('Content-Type', 'Application/json')
+//            ->withJson(['message' => 'Page not found']);
+//    };
+//};
 
 /**
  * Register Multiple actions, that only need the container..

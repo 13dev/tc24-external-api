@@ -39,9 +39,11 @@ class CustomerResource extends Resource
 
     /**
      * @param $token
-     * @return null|object
+     * @return null | Customer
      */
     public function exists($token) {
-        return $this->em->getRepository(Customer::class)->findOneBy(['token' => $token]);
+        /** @var Customer $value */
+       $value = $this->em->getRepository(Customer::class)->findOneBy(['token' => $token]);
+       return $value;
     }
 }
