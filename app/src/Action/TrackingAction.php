@@ -17,18 +17,16 @@ use App\Resource\CustomerResource;
 use App\Resource\TrackerResource;
 use Doctrine\DBAL\Exception\NotNullConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use Doctrine\DBAL\Schema\Visitor\RemoveNamespacedAssets;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use Monolog\Logger;
-use Psr\Http\Message\ResponseInterface;
+use Respect\Validation\Validator as V;
 use Slim\Container;
 use Slim\Http\Request;
 use Slim\Http\Response;
-use Respect\Validation\Validator as V;
 
 /**
  * Class TrackingAction

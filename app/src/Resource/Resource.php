@@ -8,7 +8,6 @@
 
 namespace App\Resource;
 
-
 use Doctrine\ORM\EntityManager;
 use Monolog\Logger;
 

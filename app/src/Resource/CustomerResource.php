@@ -7,6 +7,7 @@
  */
 
 namespace App\Resource;
+
 use App\Entity\Customer;
 use App\MessageEnum;
 use Doctrine\ORM\OptimisticLockException;

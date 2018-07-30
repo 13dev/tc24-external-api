@@ -8,7 +8,6 @@
 
 namespace App\Exceptions;
 
-
 use Throwable;
 
 class RequestBodyEmptyException extends \Exception

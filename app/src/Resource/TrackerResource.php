@@ -7,13 +7,13 @@
  */
 
 namespace App\Resource;
+
 use App\Entity\Customer;
 use App\Entity\Tracker;
 use App\MessageEnum;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
-
 /**
  * Class TrackerResource
  * @package App\Resource
