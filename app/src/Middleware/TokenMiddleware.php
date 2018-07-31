@@ -15,6 +15,10 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
+/**
+ * Class TokenMiddleware
+ * @package App\Middleware
+ */
 class TokenMiddleware implements MiddlewareInterface
 {
 
