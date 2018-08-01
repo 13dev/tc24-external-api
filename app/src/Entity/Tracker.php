@@ -7,7 +7,7 @@ use Doctrine\ORM\Mapping as ORM;
 /**
  * Tracker
  *
- * @ORM\Table(name="tracker", uniqueConstraints={@ORM\UniqueConstraint(name="created", columns={"created"}), @ORM\UniqueConstraint(name="customer_id", columns={"customer_id"})})
+ * @ORM\Table(name="tracker", uniqueConstraints={@ORM\UniqueConstraint(name="unique_gps", columns={"customer_id", "created"})})
  * @ORM\Entity
  */
 class Tracker
@@ -28,23 +28,16 @@ class Tracker
     /**
      * @var string
      *
-     * @ORM\Column(name="latitude", type="string", length=45, nullable=false)
+     * @ORM\Column(name="latitude", type="float", length=40, nullable=false)
      */
     private $latitude;
 
     /**
      * @var string
      *
-     * @ORM\Column(name="longitude", type="string", length=45, nullable=false)
+     * @ORM\Column(name="longitude", type="float", length=40, nullable=false)
      */
     private $longitude;
-
-    /**
-     * @var string
-     *
-     * @ORM\Column(name="address", type="string", length=200, nullable=true)
-     */
-    private $address;
 
     /**
      * @var \DateTime
@@ -96,24 +89,6 @@ class Tracker
     public function setLongitude($longitude): Tracker
     {
         $this->longitude = $longitude;
-        return $this;
-    }
-
-    /**
-     * @return string
-     */
-    public function getAddress(): string
-    {
-        return $this->address;
-    }
-
-    /**
-     * @param string $address
-     * @return Tracker
-     */
-    public function setAddress($address): Tracker
-    {
-        $this->address = $address;
         return $this;
     }
 

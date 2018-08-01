@@ -37,6 +37,21 @@ class CustomerResource extends Resource
         }
 
     }
+    /**
+     * @param string $uid
+     * @return null | Customer
+     */
+    public function findByUid(string $uid) {
+        if(!$uid)
+            return null;
+
+        $customer = $this->em
+            ->getRepository(Customer::class)
+            ->findOneBy(['uid' => $uid]);
+
+        /** @var Customer $customer */
+        return $customer;
+    }
 
     /**
      * @param string $token

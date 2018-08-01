@@ -59,7 +59,7 @@ class CustomerAction extends Action
      * @param $args
      * @return
      */
-    public function delete(Request $request, Response $response, $args) {
+    public function deleteSession(Request $request, Response $response, $args) {
         //Search user by token
         $token = $request->getHeaderLine('token');
 
@@ -74,27 +74,14 @@ class CustomerAction extends Action
             return $this->fjson->notFound(MessageEnum::CUSTOMER_NOT_FOUND);
         }
 
-        // Customer was found.
-        //Search tracker
-        if(!$cTracker = $this->trackerResource->findByCustomer($customer)) {
-            //Tracker not found
-            //Save to log
-            $this->logger->alert(MessageEnum::CUSTOMER_NO_TRACKER);
-
-            //Return generic message
-            return $this->fjson->notFound(MessageEnum::CUSTOMER_NO_TRACKER);
-        }
-
-        //remove al tracker
-        //remove customer
+        //remove customer token
         try {
-            //Remove tarcker
-            $this->em->remove($cTracker);
+            /** remove token from DB */
+            $customer->setToken(null);
+
+            //Flush data
             $this->em->flush();
 
-            //Remove customer
-            $this->em->remove($customer);
-            $this->em->flush();
         } catch (ORMException $e) {
             // Save to log
             $this->logger->error(MessageEnum::OCCURRED_EXCEPTION . ' -> ' . $e->getMessage());

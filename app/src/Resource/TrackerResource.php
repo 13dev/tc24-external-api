@@ -34,8 +34,8 @@ class TrackerResource extends Resource
             $this->em->flush();
         } catch (OptimisticLockException $e) {
             throw new OptimisticLockException(MessageEnum::FAILED_INSERT, $tracker);
-        } catch (UniqueConstraintViolationException | ORMException $e) {
-            throw new ORMException(MessageEnum::FAILED_INSERT, $tracker);
+        } catch (ORMException $e) {
+            throw new ORMException($e->getMessage());
         }
 
     }
@@ -47,7 +47,7 @@ class TrackerResource extends Resource
     public function findByCustomer(Customer $customer) {
       $tracker = $this->em
             ->getRepository(Tracker::class)
-            ->findOneBy(['customer' => $customer]);
+            ->findBy(['customer' => $customer]);
 
         /** @var Tracker $tracker */
         return $tracker;

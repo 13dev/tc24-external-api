@@ -13,8 +13,10 @@ use App\Entity\Tracker;
 use App\Exceptions\RequestBodyEmptyException;
 use App\HTTPCode;
 use App\MessageEnum;
+use App\RegexEnum;
 use App\Resource\CustomerResource;
 use App\Resource\TrackerResource;
+use App\Traits\Helpers;
 use Doctrine\DBAL\Exception\NotNullConstraintViolationException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManager;
@@ -38,6 +40,8 @@ use Slim\Http\Response;
  */
 class TrackingAction extends Action
 {
+
+    use Helpers;
     /**
      * @var TrackerResource
      */
@@ -69,6 +73,28 @@ class TrackingAction extends Action
     }
 
     /**
+     * ARGUMENTS:
+     * {uid} - customer identifier
+     *
+     * POST PARAMETERS:
+     * {latitude} - ^[-+]?(\d*[.])?\d+$
+     * {longitude} - ^[-+]?(\d*[.])?\d+$
+     * {dateTime} - ^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$
+     * The body of request should be in JSON example:
+     * {
+     * "uid": "UID VALUE",
+     * "data": [{
+     *      "latitude":"32.688656",         // regexp: ^[-+]?(\d*[.])?\d+$
+     *      "longitude":"-16.791765"          // regexp: ^[-+]?(\d*[.])?\d+$
+     *      "dateTime":"2017-11-08 17:01:39"  // regexp: ^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$
+     *      },
+     *      {
+     *      "latitude":"32.6561411",           // regexp:^[-+]?(\d*[.])?\d+$
+     *      "longitude":"-16.9339971"          // regexp: ^[-+]?(\d*[.])?\d+$
+     *      "dateTime":"2017-11-08 17:05:00"  // regexp: ^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$
+     *      },]
+     * }
+     *
      * @param Request $request
      * @param Response $response
      * @param $args
@@ -76,33 +102,97 @@ class TrackingAction extends Action
      */
     public function postTracking(Request $request, Response $response, $args): Response
     {
-
         $this->logger->info('postTraking called!');
+
+        //Get body as string
+        $body = $request->getBody()->getContents();
+
+        /** @var array $data store all required params */
+        $data = $request->getParams(['longitude', 'latitude', 'dateTime', 'uid']);
+
+        /** @var bool $bodyIsJson is body a json? */
+        $bodyIsJson = $this->isJson($body);
+
+        /** @var array $bodyInJson this var store data of body sent with json */
+        $bodyInJson = $bodyIsJson ? json_decode($body, true) : null;
+
+        /** @var string $customerUid get customer uid*/
+        $customerUid = $bodyIsJson ? $bodyInJson['uid'] : $data['uid'];
 
         // Get token
         $token = $request->getHeaderLine('token');
 
-        // Verify validation
-        if (!$this->validateParams($request)->isValid()) {
+        if($bodyIsJson === true){
+            /** key data or key uid in json is missing? */
+            if(!array_key_exists('data', $bodyInJson) || !array_key_exists('uid', $bodyInJson)) {
+                // save to Log
+                $this->logger->alert('Mal formed json');
 
-            $this->logger->info('validateParams failed!');
+                //Render exception as json
+                return $this->fjson->renderException(HTTPCode::HTTP_BAD_REQUEST, MessageEnum::BODY_MALFORMED);
+            }
 
-            // Verification fails
-            return $this->fjson->renderException(
-                HTTPCode::HTTP_BAD_REQUEST,
-                MessageEnum::PARAM_VALIDATION_ERROR
-            );
+            // verify if data is a array
+            if(!\is_array($bodyInJson['data'])){
+                // save to Log
+                $this->logger->alert('Body is not an array');
+
+                //Render exception as json
+                return $this->fjson->renderException(HTTPCode::HTTP_BAD_REQUEST, MessageEnum::BODY_MALFORMED);
+            }
+
+            //Validate each one tracker
+            foreach ($bodyInJson['data'] as $i => $tracker) {
+                $validator = $this->validator->array($tracker, [
+                    'latitude' => V::notEmpty()->notBlank()->regex(RegexEnum::LATITUDE),
+                    'longitude' => V::notEmpty()->notBlank()->regex(RegexEnum::LONGITUDE),
+                    'dateTime' => V::notEmpty()->notBlank()->regex(RegexEnum::DATE_TIME)
+                ]);
+
+                if(!$validator->isValid()) {
+                    $this->logger->debug('Validation of params fails.. ' . $validator->count() . ' Errors');
+
+                    //Render exception as json
+                    return $this->fjson->renderException(HTTPCode::HTTP_BAD_REQUEST, MessageEnum::BODY_MALFORMED);
+                }
+
+                //Convert string to DateTime object
+                $bodyInJson['data'][$i]['dateTime'] = \DateTime::createFromFormat('Y-m-d H:i:s', $tracker['dateTime']);
+
+            }
+
+        } else {
+            //Body is not a json
+            //verify params
+            $validator = $this->validator->array($data, [
+                'latitude' => V::notEmpty()->notBlank()->regex(RegexEnum::LATITUDE),
+                'longitude' => V::notEmpty()->notBlank()->regex(RegexEnum::LONGITUDE),
+                'dateTime' => V::notEmpty()->notBlank()->regex(RegexEnum::DATE_TIME),
+                'uid' => V::notEmpty()->notBlank(),
+            ]);
+
+            //Validate params
+            if(!$validator->isValid()) {
+                $this->logger->debug('Validation of params fails.. ' . $validator->count() . ' Errors');
+
+                //Render exception as json
+                return $this->fjson->renderException(HTTPCode::HTTP_BAD_REQUEST, MessageEnum::PARAM_VALIDATION_ERROR);
+            }
+
+            //Convert data
+            $data['dateTime'] = \DateTime::createFromFormat('Y-m-d H:i:s',$data['dateTime']);
 
         }
 
         // User already on DB
-        if ($customer = $this->customerResource->exists($token)) {
+        if ($customer = $this->customerResource->findByUid($customerUid)) {
+
             //Separate logic
             try {
                 /**
                  * This function will return (if doesn't throw exception) the updated data.
                  */
-               return $this->handleCustomerExists($customer, $request, $response, $args);
+                return $this->handleCustomerExists($customer, $bodyIsJson ? $bodyInJson['data'] : [$data], $customerUid, $token);
 
             } catch (UniqueConstraintViolationException $e) {
                 // Save to log
@@ -124,55 +214,95 @@ class TrackingAction extends Action
 
                 //Return generic message
                 return $this->fjson->renderException(HTTPCode::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::OCCURRED_EXCEPTION );
+
+            } catch (RequestBodyEmptyException $e) {
+                //Save to Log
+                $this->logger->error('RequestBodyEmptyException -> ' . $e->getMessage());
+
+                //Return message
+                return $this->fjson->renderException(HTTPCode::HTTP_OK, MessageEnum::CUSTOMER_NO_INFORMATION);
+
+            } catch (GuzzleException $e) {
+                // Save to log information
+                $this->logger->error('GuzzleException -> ' . $e->getCode() . '  ' . $e->getMessage());
+
+                //Invalid token ?!
+                if($e->getCode() === HTTPCode::HTTP_UNAUTHORIZED) {
+                    // The token is invalid or doesn't exists.
+                    return $this->fjson->renderException(HTTPCode::HTTP_UNAUTHORIZED, MessageEnum::INVALID_TOKEN);
+                }
+
+                // Fail to make a request to TC24.
+                return $this->fjson->renderException(HTTPCode::HTTP_NOT_FOUND, MessageEnum::FAILED_REQUEST);
             }
         }
 
         // Make a request to get current user
         try {
-            $customerInformation = $this->handleCustomerInformation($token);
-
-        } catch (RequestBodyEmptyException $e) {
-            $this->logger->error('RequestBodyEmptyException -> ' . $e->getMessage());
-
-            return $this->fjson->renderException(HTTPCode::HTTP_OK, $e->getMessage());
-
-        } catch (GuzzleException $e) {
-            $this->logger->error('GuzzleException -> ' . $e->getCode() . '  ' . $e->getMessage());
-            //Invalid token ?!
-            if($e->getCode() === HTTPCode::HTTP_UNAUTHORIZED) {
-                return $this->fjson->renderException(HTTPCode::HTTP_UNAUTHORIZED, MessageEnum::INVALID_TOKEN);
-            }
-
-            return $this->fjson->renderException(HTTPCode::HTTP_NOT_FOUND, MessageEnum::FAILED_REQUEST);
-        }
-
-        $validator = $this->validateParams($request);
-        // Verify validation
-        if (!$validator->isValid()) {
-            // Verification fails
-            return $this->fjson->render($validator->getErrors(), HTTPCode::HTTP_BAD_REQUEST, MessageEnum::PARAM_VALIDATION_ERROR);
-        }
-
-        try {
+            // GET User information {/current}
+            $customerInformation = $this->makeCurrentRequest($token);
 
             // Store in DB
             // Create new Customer
             $customer = new Customer();
-            //$customer->setUid($responseData['data']['code']);
-            $customer->setUid(time());
+            $customer->setUid($customerUid);
             $customer->setEmail($customerInformation['email']);
             $customer->setToken($token);
 
-            $tracker = new Tracker();
-            $tracker->setAddress($request->getParam('address'));
-            $tracker->setCustomer($customer);
-            $tracker->setLatitude($request->getParam('latitude'));
-            $tracker->setLongitude($request->getParam('longitude'));
-
             // Store customer
             $this->customerResource->store($customer);
-            // Store Tracker
-            $this->trackerResource->store($tracker);
+
+            if($bodyIsJson) {
+                // Iteract all key's sent on body as json
+                foreach ($bodyInJson['data'] as $sentTracker) {
+
+                    //Create new tracker
+                    $tracker = new Tracker();
+                    $tracker->setCustomer($customer);
+                    $tracker->setLatitude($sentTracker['latitude']);
+                    $tracker->setLongitude($sentTracker['longitude']);
+                    $tracker->setCreated($sentTracker['dateTime']);
+
+                    //$this->em->persist($tracker);
+                    $this->trackerResource->store($tracker);
+                    // flush everything to the database every 5 inserts
+                    //if (($i % 5) === 0) {
+                    //    $this->em->flush();
+                    //    $this->em->clear();
+                    //}
+
+                }
+            } else {
+                //Body is not json insert one only
+                $tracker = new Tracker();
+                $tracker->setCustomer($customer);
+                $tracker->setLatitude($data['latitude']);
+                $tracker->setLongitude($data['longitude']);
+                $tracker->setCreated($data['dateTime']);
+
+                $this->trackerResource->store($tracker);
+            }
+
+
+        } catch (RequestBodyEmptyException $e) {
+            //Save to log
+            $this->logger->error('RequestBodyEmptyException -> ' . $e->getMessage());
+
+            //Return a message
+            return $this->fjson->renderException(HTTPCode::HTTP_OK, $e->getMessage());
+
+        } catch (GuzzleException $e) {
+            $this->logger->error('GuzzleException -> ' . $e->getCode() . '  ' . $e->getMessage());
+
+            //Invalid token ?!
+            if($e->getCode() === HTTPCode::HTTP_UNAUTHORIZED) {
+                 // The token is invalid or doesn't exists.
+                return $this->fjson->renderException(HTTPCode::HTTP_UNAUTHORIZED, MessageEnum::INVALID_TOKEN);
+            }
+
+            // Fail to make a request to TC24.
+            return $this->fjson->renderException(HTTPCode::HTTP_NOT_FOUND, MessageEnum::FAILED_REQUEST);
+
         } catch (ORMException | OptimisticLockException | UniqueConstraintViolationException | NotNullConstraintViolationException $e) {
             //Store on Logger
             $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
@@ -181,6 +311,7 @@ class TrackingAction extends Action
             return $this->fjson->renderException(HTTPCode::HTTP_OK, MessageEnum::FAILED_INSERT);
         }
 
+        //Tracker, user created
         return $this->fjson->render($customerInformation, HTTPCode::HTTP_OK);
 
     }
@@ -219,76 +350,63 @@ class TrackingAction extends Action
         }
 
         // Return information about tracking and customer.
-        return $this->fjson->render([
-            'email' => $customer->getEmail(),
-            'latitude' => $cTracker->getLatitude(),
-            'longitude' => $cTracker->getLongitude(),
-            'address' => $cTracker->getAddress(),
-            'created' => $cTracker->getCreated()
-        ]);
+        return $this->fjson->render([$cTracker]);
     }
 
     /**
      * Handle When customer exists on DB
      * USED ON postTracking function
+     *
      * @param Customer $customer
-     * @param Request $request
-     * @param Response $response
-     * @param $args
+     * @param array $body
+     * @param string $customerUid
+     * @param string $customerToken
      * @return Response
-     * @throws OptimisticLockException
+     * @throws GuzzleException
      * @throws ORMException
+     * @throws OptimisticLockException
+     * @throws RequestBodyEmptyException
      * @throws UniqueConstraintViolationException
      */
-    private function handleCustomerExists(Customer $customer, Request $request, Response $response, $args): Response
+    private function handleCustomerExists(Customer $customer, array $body, string $customerUid, string $customerToken): Response
     {
-        // Search if tracker exists, and return - it !
-        if($uTracker = $this->trackerResource->exists($customer->getId())){
+        // Verify if customer have the token
+        if($customer->getToken() === null) {
+            // Customer don't have token
+            //Get session from YGT
+            // GET User information {/current}
+            $customerInformation = $this->makeCurrentRequest($customerToken);
 
-            $uTracker->setAddress($request->getParam('address'));
-            $uTracker->setLatitude($request->getParam('latitude'));
-            $uTracker->setLongitude($request->getParam('longitude'));
+            //update customer token
+            $customer->setToken($customerToken);
+            $customer->setUid($customerUid);
+            $customer->setEmail($customerInformation['email']);
 
-            try {
+            //Flush customer
+            $this->em->flush($customer);
 
-                $this->em->flush();
-
-            } catch (OptimisticLockException $e) {
-                throw new OptimisticLockException(MessageEnum::FAIL_UPDATE, $uTracker);
-
-            } catch (ORMException $e) {
-                throw new ORMException(MessageEnum::FAIL_UPDATE);
-            }
-
-
-            return $this->fjson->render([
-                'latitude' => $uTracker->getLatitude(),
-                'longitude' => $uTracker->getLongitude(),
-                'address' => $uTracker->getAddress(),
-            ], HTTPCode::HTTP_OK);
         }
 
-        // Track doesn't exists, assign the customer and save it
-        // create tracker from entity
-        $tracker = new Tracker();
-        $tracker->setAddress($request->getParam('address'));
-        $tracker->setLatitude($request->getParam('latitude'));
-        $tracker->setLongitude($request->getParam('longitude'));
-        /** @var Customer $customer */
-        $tracker->setCustomer($customer);
+        // Iteract all key's sent on body as json
+        foreach ($body as $sentTracker) {
+            // Create a tracker
+            // create tracker from entity
+            $tracker = new Tracker();
+            $tracker->setCustomer($customer);
+            $tracker->setLatitude((double) $sentTracker['latitude']);
+            $tracker->setLongitude((double) $sentTracker['longitude']);
+            $tracker->setCreated($sentTracker['dateTime']);
 
-        try {
-
+            //$this->em->persist($tracker);
             $this->trackerResource->store($tracker);
-
-        } catch (OptimisticLockException $e) {
-            throw new OptimisticLockException(MessageEnum::FAILED_INSERT, $tracker);
-
-        } catch (ORMException $e) {
-            throw new ORMException(MessageEnum::FAILED_INSERT);
+            // flush everything to the database every 5 inserts
+            //if (($i % 5) === 0) {
+            //    $this->em->flush();
+            //    $this->em->clear();
+            //}
         }
 
-        return $this->fjson->render([json_encode($customer, true)], HTTPCode::HTTP_OK);
+        return $this->fjson->render($body, HTTPCode::HTTP_OK, MessageEnum::SUCCESSFULLY_INSERTED);
 
     }
 
@@ -303,7 +421,7 @@ class TrackingAction extends Action
      * @return mixed|Response
      * @throws RequestBodyEmptyException
      */
-    private function handleCustomerInformation(string $token) {
+    private function makeCurrentRequest(string $token) {
 
         // make request to get information about the token
         $responseTC = $this->guzzleClient->request(
@@ -325,17 +443,4 @@ class TrackingAction extends Action
 
     }
 
-    /**
-     * @return \Awurth\SlimValidation\Validator
-     */
-    private function validateParams(Request $request): \Awurth\SlimValidation\Validator
-    {
-
-        return $this->validator->validate($request, [
-            'address' => V::notEmpty(),
-            'latitude' => V::notBlank()->numeric(),
-            'longitude' => V::notBlank(),
-            // ...
-        ]);
-    }
 }

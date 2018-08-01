@@ -52,4 +52,10 @@ abstract class MessageEnum
 
     // This message will be show when te removed successfully
     public const REMOVED = 'Removed successfully!';
+
+    //When the given body doesn't follow the structure
+    public const BODY_MALFORMED = 'The body that was sent does not follow the requested structure!';
+
+    // data was inserted
+    public const SUCCESSFULLY_INSERTED = 'Success, the given data was inserted!';
 }

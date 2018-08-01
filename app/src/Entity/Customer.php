@@ -24,7 +24,7 @@ class Customer
     /**
      * @var integer
      *
-     * @ORM\Column(name="uid", type="bigint", nullable=false)
+     * @ORM\Column(name="uid", type="string", nullable=false)
      */
     private $uid;
 
@@ -91,9 +91,9 @@ class Customer
     }
 
     /**
-     * @return string
+     * @return null|string
      */
-    public function getToken(): string
+    public function getToken(): ?string
     {
         return $this->token;
     }

@@ -8,7 +8,7 @@
         "monolog/monolog": "^1.17",
         "doctrine/orm": "^2.5",
         "guzzlehttp/guzzle": "^6.3",
-        "awurth/slim-validation": "^2.1",
+        "awurth/slim-validation": "^3.0",
         "psr/http-server-middleware": "^1.0"
     },
     "autoload": {
