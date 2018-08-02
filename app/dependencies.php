@@ -1,6 +1,10 @@
 <?php
 
+use App\Action\CustomerAction;
+use App\Action\TrackingAction;
 use App\FJson;
+use App\Resource\CustomerResource;
+use App\Resource\TrackerResource;
 
 /**
  * Inject Monolog
@@ -51,6 +55,8 @@ $container['fjson'] = function($container) {
 
 /**
  * Generic Exceptions to JSON
+ * @param $container
+ * @return Closure
  */
 $container['errorHandler'] = function ($container) {
     return function ($request, $response, $exception) use ($container) {
@@ -63,6 +69,8 @@ $container['errorHandler'] = function ($container) {
 
 /**
  * Exceptions 405 - Not Allowed to Json
+ * @param $container
+ * @return Closure
  */
 $container['notAllowedHandler'] = function ($container) {
     return function ($request, $response, $methods) use ($container) {
@@ -70,13 +78,15 @@ $container['notAllowedHandler'] = function ($container) {
             ->withStatus(405)
             ->withHeader('Allow', implode(', ', $methods))
             ->withHeader('Content-Type', 'Application/json')
-            ->withHeader('Access-Control-Allow-Methods', implode(",", $methods))
+            ->withHeader('Access-Control-Allow-Methods', implode(',', $methods))
             ->withJson(['message' => 'Method not Allowed; Method must be one of: ' . implode(', ', $methods)], 405);
     };
 };
 
 /**
  * Exceptions 404 - Not Found to JSON
+ * @param $container
+ * @return Closure
  */
 $container['notFoundHandler'] = function ($container) {
     return function ($request, $response) use ($container) {
@@ -88,20 +98,27 @@ $container['notFoundHandler'] = function ($container) {
 };
 
 /**
- * Register Multiple actions, that only need the container..
+ * Inject the Tracking action (main of this project)
+ * @param $container
+ * @return TrackingAction
  */
-//new \App\MultipleRegistor($container , [
-//    'App\Action\TrackingAction',
-//]);
-
-$container['App\Action\TrackingAction'] = function ($container) {
-    $trackingResource = new \App\Resource\TrackerResource($container->get('em'), $container->get('logger'));
-    $customerResource = new \App\Resource\CustomerResource($container->get('em'), $container->get('logger'));
-    return new App\Action\TrackingAction($container, $trackingResource, $customerResource);
+$container[TrackingAction::class] = function ($container) {
+    return new TrackingAction(
+        $container,
+        new TrackerResource($container->get('em'), $container->get('logger')),
+        new CustomerResource($container->get('em'), $container->get('logger'))
+    );
 };
 
-$container['App\Action\CustomerAction'] = function ($container) {
-    $trackingResource = new \App\Resource\TrackerResource($container->get('em'), $container->get('logger'));
-    $customerResource = new \App\Resource\CustomerResource($container->get('em'), $container->get('logger'));
-    return new App\Action\CustomerAction($container, $trackingResource, $customerResource);
+/**
+ * Register the customer action
+ * @param $container
+ * @return CustomerAction
+ */
+$container[CustomerAction::class] = function ($container) {
+    return new CustomerAction(
+        $container,
+        new TrackerResource($container->get('em'), $container->get('logger')),
+        new CustomerResource($container->get('em'), $container->get('logger'))
+    );
 };

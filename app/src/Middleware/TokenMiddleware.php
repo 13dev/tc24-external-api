@@ -9,7 +9,7 @@
 namespace App\Middleware;
 
 use App\Exceptions\TokenNotFoundException;
-use App\MessageEnum;
+use App\Enum\MessageEnum;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;

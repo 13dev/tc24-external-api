@@ -3,7 +3,7 @@
  * TravelCentral24.
  * User: Leonardo Oliveira
  * Date: 26/07/2018 - 16:25
- * Description:
+ * Description: Main class resource will receive the default props.
  */
 
 namespace App\Resource;

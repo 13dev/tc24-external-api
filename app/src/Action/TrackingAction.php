@@ -10,10 +10,10 @@ namespace App\Action;
 
 use App\Entity\Customer;
 use App\Entity\Tracker;
+use App\Enum\RegexEnum;
 use App\Exceptions\RequestBodyEmptyException;
-use App\HTTPCode;
-use App\MessageEnum;
-use App\RegexEnum;
+use App\Enum\HTTPCodeEnum;
+use App\Enum\MessageEnum;
 use App\Resource\CustomerResource;
 use App\Resource\TrackerResource;
 use App\Traits\Helpers;
@@ -84,13 +84,13 @@ class TrackingAction extends Action
      * {
      * "uid": "UID VALUE",
      * "data": [{
-     *      "latitude":"32.688656",         // regexp: ^[-+]?(\d*[.])?\d+$
+     *      "latitude":"32.688656",           // regexp: ^[-+]?(\d*[.])?\d+$
      *      "longitude":"-16.791765"          // regexp: ^[-+]?(\d*[.])?\d+$
      *      "dateTime":"2017-11-08 17:01:39"  // regexp: ^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$
      *      },
      *      {
-     *      "latitude":"32.6561411",           // regexp:^[-+]?(\d*[.])?\d+$
-     *      "longitude":"-16.9339971"          // regexp: ^[-+]?(\d*[.])?\d+$
+     *      "latitude":"32.6561411",          // regexp:^[-+]?(\d*[.])?\d+$
+     *      "longitude":"-16.9339971"         // regexp: ^[-+]?(\d*[.])?\d+$
      *      "dateTime":"2017-11-08 17:05:00"  // regexp: ^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$
      *      },]
      * }
@@ -129,7 +129,7 @@ class TrackingAction extends Action
                 $this->logger->alert('Mal formed json');
 
                 //Render exception as json
-                return $this->fjson->renderException(HTTPCode::HTTP_BAD_REQUEST, MessageEnum::BODY_MALFORMED);
+                return $this->fjson->renderException(HTTPCodeEnum::HTTP_BAD_REQUEST, MessageEnum::BODY_MALFORMED);
             }
 
             // verify if data is a array
@@ -138,7 +138,7 @@ class TrackingAction extends Action
                 $this->logger->alert('Body is not an array');
 
                 //Render exception as json
-                return $this->fjson->renderException(HTTPCode::HTTP_BAD_REQUEST, MessageEnum::BODY_MALFORMED);
+                return $this->fjson->renderException(HTTPCodeEnum::HTTP_BAD_REQUEST, MessageEnum::BODY_MALFORMED);
             }
 
             //Validate each one tracker
@@ -153,7 +153,7 @@ class TrackingAction extends Action
                     $this->logger->debug('Validation of params fails.. ' . $validator->count() . ' Errors');
 
                     //Render exception as json
-                    return $this->fjson->renderException(HTTPCode::HTTP_BAD_REQUEST, MessageEnum::BODY_MALFORMED);
+                    return $this->fjson->renderException(HTTPCodeEnum::HTTP_BAD_REQUEST, MessageEnum::BODY_MALFORMED);
                 }
 
                 //Convert string to DateTime object
@@ -176,7 +176,7 @@ class TrackingAction extends Action
                 $this->logger->debug('Validation of params fails.. ' . $validator->count() . ' Errors');
 
                 //Render exception as json
-                return $this->fjson->renderException(HTTPCode::HTTP_BAD_REQUEST, MessageEnum::PARAM_VALIDATION_ERROR);
+                return $this->fjson->renderException(HTTPCodeEnum::HTTP_BAD_REQUEST, MessageEnum::PARAM_VALIDATION_ERROR);
             }
 
             //Convert data
@@ -199,41 +199,41 @@ class TrackingAction extends Action
                 $this->logger->error(MessageEnum::UNIQUE_VIOLATION . ' -> ' . $e->getMessage());
 
                 //Return generic message
-                return $this->fjson->renderException(HTTPCode::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::UNIQUE_VIOLATION );
+                return $this->fjson->renderException(HTTPCodeEnum::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::UNIQUE_VIOLATION );
 
             } catch (OptimisticLockException $e) {
                 // Save to log
                 $this->logger->error(MessageEnum::OCCURRED_EXCEPTION . ' -> ' . $e->getMessage());
 
                 //Return generic message
-                return $this->fjson->renderException(HTTPCode::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::OCCURRED_EXCEPTION );
+                return $this->fjson->renderException(HTTPCodeEnum::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::OCCURRED_EXCEPTION );
 
             } catch (ORMException $e) {
                 // Save to log
                 $this->logger->error(MessageEnum::OCCURRED_EXCEPTION . ' -> ' . $e->getMessage());
 
                 //Return generic message
-                return $this->fjson->renderException(HTTPCode::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::OCCURRED_EXCEPTION );
+                return $this->fjson->renderException(HTTPCodeEnum::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::OCCURRED_EXCEPTION );
 
             } catch (RequestBodyEmptyException $e) {
                 //Save to Log
                 $this->logger->error('RequestBodyEmptyException -> ' . $e->getMessage());
 
                 //Return message
-                return $this->fjson->renderException(HTTPCode::HTTP_OK, MessageEnum::CUSTOMER_NO_INFORMATION);
+                return $this->fjson->renderException(HTTPCodeEnum::HTTP_OK, MessageEnum::CUSTOMER_NO_INFORMATION);
 
             } catch (GuzzleException $e) {
                 // Save to log information
                 $this->logger->error('GuzzleException -> ' . $e->getCode() . '  ' . $e->getMessage());
 
                 //Invalid token ?!
-                if($e->getCode() === HTTPCode::HTTP_UNAUTHORIZED) {
+                if($e->getCode() === HTTPCodeEnum::HTTP_UNAUTHORIZED) {
                     // The token is invalid or doesn't exists.
-                    return $this->fjson->renderException(HTTPCode::HTTP_UNAUTHORIZED, MessageEnum::INVALID_TOKEN);
+                    return $this->fjson->renderException(HTTPCodeEnum::HTTP_UNAUTHORIZED, MessageEnum::INVALID_TOKEN);
                 }
 
                 // Fail to make a request to TC24.
-                return $this->fjson->renderException(HTTPCode::HTTP_NOT_FOUND, MessageEnum::FAILED_REQUEST);
+                return $this->fjson->renderException(HTTPCodeEnum::HTTP_NOT_FOUND, MessageEnum::FAILED_REQUEST);
             }
         }
 
@@ -289,30 +289,30 @@ class TrackingAction extends Action
             $this->logger->error('RequestBodyEmptyException -> ' . $e->getMessage());
 
             //Return a message
-            return $this->fjson->renderException(HTTPCode::HTTP_OK, $e->getMessage());
+            return $this->fjson->renderException(HTTPCodeEnum::HTTP_OK, $e->getMessage());
 
         } catch (GuzzleException $e) {
             $this->logger->error('GuzzleException -> ' . $e->getCode() . '  ' . $e->getMessage());
 
             //Invalid token ?!
-            if($e->getCode() === HTTPCode::HTTP_UNAUTHORIZED) {
+            if($e->getCode() === HTTPCodeEnum::HTTP_UNAUTHORIZED) {
                  // The token is invalid or doesn't exists.
-                return $this->fjson->renderException(HTTPCode::HTTP_UNAUTHORIZED, MessageEnum::INVALID_TOKEN);
+                return $this->fjson->renderException(HTTPCodeEnum::HTTP_UNAUTHORIZED, MessageEnum::INVALID_TOKEN);
             }
 
             // Fail to make a request to TC24.
-            return $this->fjson->renderException(HTTPCode::HTTP_NOT_FOUND, MessageEnum::FAILED_REQUEST);
+            return $this->fjson->renderException(HTTPCodeEnum::HTTP_NOT_FOUND, MessageEnum::FAILED_REQUEST);
 
         } catch (ORMException | OptimisticLockException | UniqueConstraintViolationException | NotNullConstraintViolationException $e) {
             //Store on Logger
             $this->logger->error(MessageEnum::FAILED_INSERT . ' ' . $e->getMessage());
 
             // Show message to user
-            return $this->fjson->renderException(HTTPCode::HTTP_OK, MessageEnum::FAILED_INSERT);
+            return $this->fjson->renderException(HTTPCodeEnum::HTTP_OK, MessageEnum::FAILED_INSERT);
         }
 
         //Tracker, user created
-        return $this->fjson->render($customerInformation, HTTPCode::HTTP_OK);
+        return $this->fjson->render($customerInformation, HTTPCodeEnum::HTTP_OK);
 
     }
 
@@ -340,7 +340,7 @@ class TrackingAction extends Action
         // Customer was found.
 
         //Search tracker
-        if(!$cTracker = $this->trackerResource->findByCustomer($customer)) {
+        if(!$cTrackers = $this->trackerResource->findByCustomer($customer)) {
             //Tracker not found
             //Save to log
             $this->logger->alert(MessageEnum::CUSTOMER_NO_TRACKER);
@@ -348,9 +348,22 @@ class TrackingAction extends Action
             //Return generic message
             return $this->fjson->notFound(MessageEnum::CUSTOMER_NO_TRACKER);
         }
+        /** @var array $data store all trackers to send on response
+         */
+        $data['uid'] = $customer->getId();
+        $data['email'] = $customer->getEmail();
 
-        // Return information about tracking and customer.
-        return $this->fjson->render([$cTracker]);
+        /** @var Tracker $tracker */
+        foreach ($cTrackers as $tracker) {
+            /** Build response array */
+            $data['tracker'][] = [
+                'latitude' => $tracker->getLatitude(),
+                'longitude' =>$tracker->getLongitude(),
+                'dateTime' => $tracker->getCreated()
+            ];
+        }
+        // Return information about tracking
+        return $this->fjson->render($data, HTTPCodeEnum::HTTP_OK, MessageEnum::SUCCESSFULLY_INSERTED);
     }
 
     /**
@@ -406,7 +419,7 @@ class TrackingAction extends Action
             //}
         }
 
-        return $this->fjson->render($body, HTTPCode::HTTP_OK, MessageEnum::SUCCESSFULLY_INSERTED);
+        return $this->fjson->render($body, HTTPCodeEnum::HTTP_OK, MessageEnum::SUCCESSFULLY_INSERTED);
 
     }
 

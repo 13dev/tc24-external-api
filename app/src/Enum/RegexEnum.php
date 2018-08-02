@@ -6,7 +6,7 @@
  * Description: Store the regex expressions
  */
 
-namespace App;
+namespace App\Enum;
 
 /**
  * Class RegexEnum

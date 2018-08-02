@@ -3,13 +3,13 @@
  * TravelCentral24.
  * User: Leonardo Oliveira
  * Date: 26/07/2018 - 18:25
- * Description:
+ * Description: This class is like a model, each func will be used in action (resource)
  */
 
 namespace App\Resource;
 
 use App\Entity\Customer;
-use App\MessageEnum;
+use App\Enum\MessageEnum;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
 

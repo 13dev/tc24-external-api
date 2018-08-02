@@ -3,7 +3,7 @@
  * TravelCentral24.
  * User: Leonardo Oliveira
  * Date: 01/08/2018 - 16:00
- * Description:
+ * Description: This class contains functions to help the actions class
  */
 
 namespace App\Traits;

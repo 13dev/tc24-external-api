@@ -9,8 +9,8 @@
 namespace App\Action;
 
 use App\FJson;
-use App\HTTPCode;
-use App\MessageEnum;
+use App\Enum\HTTPCodeEnum;
+use App\Enum\MessageEnum;
 use App\Resource\CustomerResource;
 use App\Resource\TrackerResource;
 use Doctrine\ORM\EntityManager;
@@ -87,11 +87,11 @@ class CustomerAction extends Action
             $this->logger->error(MessageEnum::OCCURRED_EXCEPTION . ' -> ' . $e->getMessage());
 
             //Return generic message
-            return $this->fjson->renderException(HTTPCode::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::OCCURRED_EXCEPTION );
+            return $this->fjson->renderException(HTTPCodeEnum::HTTP_UNPROCESSABLE_ENTITY, MessageEnum::OCCURRED_EXCEPTION );
         }
 
         //removed!
-        return $this->fjson->renderException(HTTPCode::HTTP_OK, MessageEnum::REMOVED);
+        return $this->fjson->renderException(HTTPCodeEnum::HTTP_OK, MessageEnum::REMOVED);
 
     }
 }

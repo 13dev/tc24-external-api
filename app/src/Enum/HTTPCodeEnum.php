@@ -6,10 +6,10 @@
  * Description: THis file store all codes of http to return.
  */
 
-namespace App;
+namespace App\Enum;
 
 
-class HTTPCode
+class HTTPCodeEnum
 {
     public const HTTP_CONTINUE = 100;
     public const HTTP_SWITCHING_PROTOCOLS = 101;

@@ -21,7 +21,6 @@ return [
         'doctrine' => [
             'meta' => [
                 'entity_path' => [
-                    // TODO: Register automatically all the modules entity
                     __DIR__ . '/../app/src/Entity'
                 ],
                 'auto_generate_proxies' => true,

@@ -8,6 +8,7 @@
 
 namespace App;
 
+use App\Enum\MessageEnum;
 use Slim\Http\Response;
 /**
  * Class FJson
@@ -45,8 +46,13 @@ class FJson {
     public function notFound($message = ''): Response
     {
         $this->formattedResponse['status'] = 404;
-        if(empty($message))
+
+        /** Is a message empty ? yes, generic message */
+        if(empty($message)){
             $this->formattedResponse['message'] = MessageEnum::NOT_FOUND;
+        } else {
+            $this->formattedResponse['message'] = $message;
+        }
 
         return $this->_response
             ->withStatus($this->formattedResponse['status'])

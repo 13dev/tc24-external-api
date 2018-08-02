@@ -6,7 +6,7 @@
  * Description: Store messages to be returned
  */
 
-namespace App;
+namespace App\Enum;
 
 
 abstract class MessageEnum

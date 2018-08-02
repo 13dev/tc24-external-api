@@ -1,8 +1,5 @@
 <?php
 
-use Slim\Http\Request;
-use Slim\Http\Response;
-
 $prefixApi = $container->get('settings')['prefixApi'];
 
 // Routes API
